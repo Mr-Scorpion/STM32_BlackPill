@@ -40,20 +40,71 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+void UART_TxRxInitialise(void)
+{
+    // 1. Enable USART1 clock
+    RCC->APB2ENR |= (1 << 4);
+
+    // 2. Enable GPIOA clock
+    RCC->AHB1ENR |= (1 << 0);
+
+    // 3. Set PA9 (TX) and PA10 (RX) as Alternate Function (AF7 for USART1)
+    GPIOA->MODER &= ~((3 << (9 * 2)) | (3 << (10 * 2)));  // Clear mode bits
+    GPIOA->MODER |=  ((2 << (9 * 2)) | (2 << (10 * 2)));  // Set AF mode
+
+    // 4. Set PA9 and PA10 to AF7 (USART1)
+    GPIOA->AFR[1] &= ~((0xF << (2 * 4)) | (0xF << (1 * 4)));  // Clear AF bits
+    GPIOA->AFR[1] |=  ((7 << (2 * 4)) | (7 << (1 * 4)));  // Set 7(USART1) for A9 & A10 pins
+
+    // 5. Enable USART1, TX, and RX
+    USART1->CR1 = (1 << 13) | (1 << 3) | (1 << 2);  // Enable USART, TX, RX
+
+    // 6. Set baud rate (9600 baud, assuming 16MHz clock)
+    USART1->BRR = 0x682;  // Baud rate 9600, clk=16MHz
+}
+
+// Function to send a character
+void UART_SendChar(char ch) {
+    while (!(USART1->SR & (1 << 7)))  // Wait for TXE (bit 7)
+        ;
+    USART1->DR = ch;
+}
+
+// Function to send a string
+void UART_SendString(char *str) {
+    while (*str) {
+        UART_SendChar(*str++);
+    }
+}
+
+// Function to receive a string
+// Function to receive a string
+void UART_ReceiveString(char *buffer, uint16_t maxLen) {
+    uint16_t i = 0;
+    char ch;
+
+    while (i < (maxLen - 1)) {
+        while (!(USART1->SR & (1 << 5)))  // Wait for RXNE (bit 5)
+            ;
+        ch = USART1->DR;  // Read data
+
+        if (ch == '\n' || ch == '\r')  // Stop at newline or carriage return
+            break;
+
+        buffer[i++] = ch;
+    }
+
+    buffer[i] = '\0';  // Null-terminate the string
+}
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-void UART_SendString(char *str) {
-    HAL_UART_Transmit(&huart1, (uint8_t *)str, strlen(str), HAL_MAX_DELAY);
-}
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -88,22 +139,26 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  UART_TxRxInitialise();
 
   /* USER CODE END 2 */
+
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
-
+	    char rxBuf[20];
+	  	UART_ReceiveString(rxBuf, 20);  // Receive string
+		UART_SendString("Received: ");
+		UART_SendString(rxBuf);  // Echo received string
+		UART_SendString("\r\n");
     /* USER CODE BEGIN 3 */
-	  UART_SendString("Hi\r\n");  // Send data
-	  	  HAL_Delay(1000);  // Wait 1 second
+
   }
+
 
   /* USER CODE END 3 */
 }
@@ -147,56 +202,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
-
-}
-
-/**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_GPIO_Init(void)
-{
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
-
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
