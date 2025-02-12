@@ -99,43 +99,49 @@ int main(void)
   /* USER CODE BEGIN 2 */
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
-   __HAL_RCC_ADC1_CLK_ENABLE();
+     __HAL_RCC_ADC1_CLK_ENABLE();
 
-   	 GPIO_InitTypeDef GPIO_InitStruct = {0};
-   	 GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
-     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-     GPIO_InitStruct.Pull = GPIO_NOPULL;
-     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+     	 GPIO_InitTypeDef GPIO_InitStruct = {0};
+     	 GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
+       GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+       GPIO_InitStruct.Pull = GPIO_NOPULL;
+       GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+       HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-     ADC1->CR2 = 0;
-     ADC1->CR1 = 0;
-     ADC1->SQR1 = 1;
-     ADC1->SQR3 = 0;
-     ADC1->SMPR2 |= (3U<< (0*3));
-     ADC->CCR |= 1<<16;
-     ADC1->CR2 |= ADC_CR2_ADON;
+       ADC->CCR |= 1<<16;// PCLK2 divide by 4
+       ADC1->CR2 = 0;
+       ADC1->CR1 = (1<<8);//enable scan mode for multiple channel
+       ADC1->CR2 |= ADC_CR2_ADON;// A2D on
+       ADC1->CR2 |= ADC_CR2_CONT;// continuous mode
+       ADC1->SQR1 = (1 << 20); // Two conversions (L = N-1, so 2-1 = 1)
+       ADC1->SQR3 = (0 << 0) | (1 << 5); // First conversion: Channel 0, Second conversion: Channel 1
+       ADC1->SMPR2 = (1 << (0 * 3)) | (1 << (1 * 3)); // Sampling time for both channels
+       ADC1->CR2 |= (1<<10);    			   // EOC after each conversion
 
-  /* USER CODE END 2 */
+    /* USER CODE END 2 */
 
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+    /* Infinite loop */
+    /* USER CODE BEGIN WHILE */
+    while (1)
+    {
       /* USER CODE END WHILE */
-  		ADC1->SQR3 = 0;
-  		ADC1->SR = 0;
-  		adc_value1 = ADC_Read();
-  		HAL_Delay(10);
-  		ADC1->SQR3 = 1;
-  		ADC1->SR = 0;
-  		adc_value2 = ADC_Read() / 10;
-  		HAL_Delay(10);
+  	  // Start ADC
+  	  	   ADC1->SR = 0;
+  	       ADC1->CR2 |= ADC_CR2_SWSTART;
+
+  	  // Wait until the conversion is complete
+  	          while (!(ADC1->SR & ADC_SR_EOC));
+  	          // Read ADC results from DR register
+  	          adc_value1 = ADC1->DR;  // Read PA0 (First conversion)
+
+  	          while (!(ADC1->SR & ADC_SR_EOC));  // Wait for second conversion
+  	          adc_value2 = ADC1->DR;  // Read PA1 (Second conversion)
+
+  	          HAL_Delay(10);
       /* USER CODE BEGIN 3 */
     }
     /* USER CODE END 3 */
   }
-
 /**
   * @brief System Clock Configuration
   * @retval None
